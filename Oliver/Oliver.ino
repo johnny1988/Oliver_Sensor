@@ -10,7 +10,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define BT_RX 9v /// Change hardware Rx to 17
+#define BT_RX 9 /// Change hardware Rx to 17  
 #define BT_TX 8  /// Change hardware Tx to 16
 #define ONE_WIRE_BUS 7
 
