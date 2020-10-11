@@ -1,133 +1,128 @@
-//#include <SoftwareSerial.h>
-//#include <HardwareSerial.h>
+#include <SoftwareSerial.h>
 #include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_HMC5883_U.h>
 #include <Adafruit_BME280.h>
 #include <Servo.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define BT_RX 9 /// Change hardware Rx to 17  
-#define BT_TX 8  /// Change hardware Tx to 16
+#define BT_RX 9
+#define BT_TX 8
 #define ONE_WIRE_BUS 7
 
+#define addr 0x0D //I2C Address for The HMC5883
+
 MPU6050 mpu;
-#define Uart2 Serial2   ///17(RX), 16(TX)
-Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 //SoftwareSerial BTSerial(BT_RX, BT_TX);
+#define BTSerial Serial2
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature dallasSensors(&oneWire);
 Adafruit_BME280 bme = Adafruit_BME280();
 
 char    serial_buf[100];
+
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
+int error = 0;
 
 void readMPUData();
 void readHMCData();
 void readTemperature();
 void readHumidity();
-void displaySensorDetails();
 /********************************************************************/
 void setup(void)
 {
   // start serial port
   Serial.begin(9600);
-  Uart2.begin(9600);
+  //BTSerial.begin(9600);
   Wire.begin();
+  //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
+
+  Wire.beginTransmission(addr); //start talking
+  Wire.write(0x0B); // Tell the HMC5883 to Continuously Measure
+  Wire.write(0x01); // Set the Register
+  Wire.endTransmission();
+  Wire.beginTransmission(addr); //start talking
+  Wire.write(0x09); // Tell the HMC5883 to Continuously Measure
+  Wire.write(0x1D); // Set the Register
+  Wire.endTransmission();
+
   mpu.initialize();
- // BTSerial.begin(9600);
   delay(500);
   dallasSensors.begin();
   Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-
-  //Serial.println(mag.begin() && mag.isAvailable() ? "HMC5883 connection successful" : "HMC5883 connection failed");
-
-  if (!mag.begin())
-  {
-    /* There was a problem detecting the HMC5883 ... check your connections */
-    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
-    while (1);
-  }
-  displaySensorDetails();
-
-  Serial.println(dallasSensors.getDS18Count() > 0 ? "Temperature sensor found" : "Temperature sendor not found");
-  Serial.println(bme.begin() > 0 ? "Humidity sensor found" : "Humidity sendor not found");
+  Serial.println(dallasSensors.getDS18Count() > 0 ? "Temperature sensor found" : "Temperature sensor not found");
+  Serial.println(bme.begin(0x76) > 0 ? "Humidity sensor found" : "Humidity sensor not found");
 }
 
 void loop(void)
 {
-  Serial.print("D");
-  //BTSerial.print("D");
-  Uart2.print("D"); /// I dont why i need this, but i just copied from above to see
   readMPUData();
   readHMCData();
-  readTemperature();
   readHumidity();
-  Serial.println();
-  //BTSerial.println();
-  Uart2.println(); /// I dont why i need this, but i just copied from above to see
-  delay(100);
+  //  Serial.println();
+  //  BTSerial.println();
+  //  readTemperature();
+
+  delay(1000);
+  Serial.println(".");
 }
 
 void readMPUData() {
   if (mpu.testConnection()) {
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-
+    delay(1500);
     sprintf(serial_buf, "X%d|Y%d|Z%d|GX%d|GY%d|GZ%d|", ax, ay, az, gx, gy, gz);
-    Serial.print(serial_buf);
-    //BTSerial.print(serial_buf);
-   // Uart2.print(serial_buf); /// I dont know why print, i wish to write, Uart2.write(serial_buf) I need to underdstand what is doing here
+    Serial.println(serial_buf);
+    BTSerial.write(serial_buf);
   }
 }
+void readHMCData() {
 
-void readHMCData()
-{
-  /* Get a new sensor event */
-  sensors_event_t event;
-  mag.getEvent(&event);
+  int x, y, z; //triple axis data
 
-  /* Display the results (magnetic vector values are in micro-Tesla (uT)) */
-  Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print("  "); Serial.println("uT");
-  
-  /* if (mag.isAvailable())
-    {
-     sensors_event_t event;
-     mag.getEvent(&event);
-     Serial.print("MX");
-     BTSerial.print("MX");
-     Serial.print(event.magnetic.x);
-     BTSerial.print(event.magnetic.x);
-     Serial.print("|MY");
-     BTSerial.print("|MY");
-     Serial.print(event.magnetic.y);
-     BTSerial.print(event.magnetic.y);
-     Serial.print("|MZ");
-     BTSerial.print("|MZ");
-     Serial.print(event.magnetic.z);
-     BTSerial.print(event.magnetic.z);
-     Serial.print("|");
-     BTSerial.print("|");
-    }*/
+  //Tell the HMC what regist to begin writing data into
+  Wire.beginTransmission(addr);
+  Wire.write(0x00); //start with register 3.
+  Wire.endTransmission();
+
+  //Read the data.. 2 bytes for each axis.. 6 total bytes
+  Wire.requestFrom(addr, 6);
+  if (6 <= Wire.available()) {
+    x = Wire.read(); //MSB  x
+    x |= Wire.read() << 8; //LSB  x
+    z = Wire.read(); //MSB  z
+    z |= Wire.read() << 8; //LSB z
+    y = Wire.read(); //MSB y
+    y |= Wire.read() << 8; //LSB y
+  }
+  delay(500);
+  Serial.print("|MX");
+  BTSerial.write("|MX");
+  Serial.print(x);
+  BTSerial.write(x);
+  Serial.print("|MY");
+  BTSerial.write("|MY");
+  Serial.print(y);
+  BTSerial.write(y);
+  Serial.print("|MZ");
+  BTSerial.write("|MZ");
+  Serial.println(z);
+  BTSerial.write(z);
+  Serial.print("|");
 }
 
 void readTemperature() {
-  if (dallasSensors.getDS18Count() > 0)
-  {
-    dallasSensors.requestTemperatures();
-    Serial.println("DONE");
+  if (dallasSensors.getDS18Count() > 0) {
+    dallasSensors.requestTemperaturesByIndex(0);
     float temp = dallasSensors.getTempCByIndex(0);
     Serial.print("T");
-   // BTSerial.print("T");
+    BTSerial.write("T");
     Serial.print(temp);
-   // BTSerial.print(temp);
+    BTSerial.print(temp);
     Serial.print("|");
-  //  BTSerial.print("|");
+    BTSerial.write("|");
   }
 }
 
@@ -138,36 +133,18 @@ void readHumidity() {
 
   if (temp != 0 || hum != 0 || pres != 0) {
     Serial.print("BT");
-   // BTSerial.print("BT");
+    BTSerial.print("BT");
     Serial.print(temp);
-   // BTSerial.print(temp);
+    BTSerial.print(temp);
     Serial.print("|BH");
-   // BTSerial.print("|BH");
+    BTSerial.print("|BH");
     Serial.print(hum);
-   // BTSerial.print(hum);
+    BTSerial.print(hum);
     Serial.print("|BP");
-   // BTSerial.print("|BP");
+    BTSerial.print("|BP");
     Serial.print(pres);
-  //  BTSerial.print(pres);
-
+    BTSerial.print(pres);
     Serial.print("|");
-  //  BTSerial.print("|");
+    BTSerial.print("|");
   }
-
-}
-
-void displaySensorDetails()
-{
-  sensor_t sensor;
-  mag.getSensor(&sensor);
-  Serial.println("------------------------------------");
-  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" uT");
-  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" uT");
-  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" uT");  
-  Serial.println("------------------------------------");
-  Serial.println("");
-  delay(500);
 }
