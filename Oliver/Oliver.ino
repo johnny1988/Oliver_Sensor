@@ -28,14 +28,14 @@ int error = 0;
 
 void readMPUData();
 void readHMCData();
-void readTemperature();
+//void readTemperature();
 void readHumidity();
 /********************************************************************/
 void setup(void)
 {
   // start serial port
   Serial.begin(9600);
-  //BTSerial.begin(9600);
+  BTSerial.begin(9600);
   Wire.begin();
   //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
 
@@ -62,7 +62,8 @@ void loop(void)
   readHMCData();
   readHumidity();
   //  Serial.println();
-  //  BTSerial.println();
+  //BTSerial.println("Y");
+  //BTSerial.println("1");
   //  readTemperature();
 
   delay(1000);
@@ -99,31 +100,18 @@ void readHMCData() {
   }
   delay(500);
   Serial.print("|MX");
-  BTSerial.write("|MX");
+  BTSerial.print("|MX");
   Serial.print(x);
-  BTSerial.write(x);
+  BTSerial.print(x);
   Serial.print("|MY");
-  BTSerial.write("|MY");
+  BTSerial.print("|MY");
   Serial.print(y);
-  BTSerial.write(y);
+  BTSerial.println(y);
   Serial.print("|MZ");
-  BTSerial.write("|MZ");
+  BTSerial.print("|MZ");
   Serial.println(z);
-  BTSerial.write(z);
+  BTSerial.print(z);
   Serial.print("|");
-}
-
-void readTemperature() {
-  if (dallasSensors.getDS18Count() > 0) {
-    dallasSensors.requestTemperaturesByIndex(0);
-    float temp = dallasSensors.getTempCByIndex(0);
-    Serial.print("T");
-    BTSerial.write("T");
-    Serial.print(temp);
-    BTSerial.print(temp);
-    Serial.print("|");
-    BTSerial.write("|");
-  }
 }
 
 void readHumidity() {
@@ -131,11 +119,12 @@ void readHumidity() {
   float hum = bme.readHumidity();
   float pres = bme.readPressure();
 
-  if (temp != 0 || hum != 0 || pres != 0) {
-    Serial.print("BT");
-    BTSerial.print("BT");
+  if (temp != 0 || hum != 0 || pres != 0) 
+  {
+    Serial.print("|BT");
+    BTSerial.print("|BT");
     Serial.print(temp);
-    BTSerial.print(temp);
+    BTSerial.print(temp);  
     Serial.print("|BH");
     BTSerial.print("|BH");
     Serial.print(hum);
