@@ -7,11 +7,15 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define BT_RX 9
-#define BT_TX 8
+#define PINServo 9
+#define PINVoltKnob A0
 #define ONE_WIRE_BUS 7
 
 #define addr 0x0D //I2C Address for The HMC5883
+Servo ServoM;
+int ValueKnob;
+int ValueServ;
+int angle = 10;
 
 MPU6050 mpu;
 //SoftwareSerial BTSerial(BT_RX, BT_TX);
@@ -36,6 +40,8 @@ void setup(void)
   // start serial port
   Serial.begin(9600);
   BTSerial.begin(9600);
+  ServoM.attach(PINServo);
+  ServoM.write(10);
   Wire.begin();
   //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
 
@@ -61,10 +67,22 @@ void loop(void)
   readMPUData();
   readHMCData();
   readHumidity();
-  //  Serial.println();
-  //BTSerial.println("Y");
-  //BTSerial.println("1");
-  //  readTemperature();
+  ValueKnob = analogRead(PINServo);
+  ValueServ = map(ValueKnob, 0, 1023, 5, 175); // will map knob value range to servo value range
+  ServoM.write(ValueServ); // shaft of servo will start to rotate.
+
+  // scan from 0 to 180 degrees
+  for (angle = 10; angle < 180; angle++)
+  {
+    ServoM.write(angle);
+    delay(15);
+  }
+  // now scan back from 180 to 0 degrees
+  for (angle = 180; angle > 10; angle--)
+  {
+    ServoM.write(angle);
+    delay(15);
+  }
 
   delay(1000);
   Serial.println(".");
@@ -119,12 +137,12 @@ void readHumidity() {
   float hum = bme.readHumidity();
   float pres = bme.readPressure();
 
-  if (temp != 0 || hum != 0 || pres != 0) 
+  if (temp != 0 || hum != 0 || pres != 0)
   {
     Serial.print("|BT");
     BTSerial.print("|BT");
     Serial.print(temp);
-    BTSerial.print(temp);  
+    BTSerial.print(temp);
     Serial.print("|BH");
     BTSerial.print("|BH");
     Serial.print(hum);
