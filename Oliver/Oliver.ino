@@ -1,11 +1,9 @@
 /// Start Add Libraries
 #include <Wire.h>
-//#include <I2Cdev.h>
+#include <I2Cdev.h>
 #include <MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Servo.h>
-#include <avr/dtostrf.h>
 /// End Of Libraries
 
 /// Start of Definiations
@@ -42,13 +40,13 @@ void setup(void)
   // Initialize HMC5883L Communication
   Wire.begin();  /// used for HMC5883L Sensor
   //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
-  Wire.beginTransmission(addr); 
-  Wire.write(0x0B); 
-  Wire.write(0x01); 
+  Wire.beginTransmission(addr);
+  Wire.write(0x0B);
+  Wire.write(0x01);
   Wire.endTransmission();
   Wire.beginTransmission(addr); //start talking
-  Wire.write(0x09); // Tell the HMC5883 to Continuously Measure
-  Wire.write(0x1D); 
+  Wire.write(0x09); // Tell the HMC5883L to Continuously Measure
+  Wire.write(0x1D);
   Wire.endTransmission();
   delay(500);
   /// End of HMC5883L Initialize
@@ -68,9 +66,8 @@ void loop(void)
   readHMCData();
   readHumidity();
   ////
-  
-////////////////////////// Dummy Test Servo
 
+  ////////////////////////// Dummy Test Servo
   // scan from 0 to 180 degrees
   for (angle = 10; angle < 180; angle++)
   {
@@ -83,12 +80,10 @@ void loop(void)
     ServoM.write(angle);
     delay(15);
   }
-//////////////////////// End of Dummy Test Servo
-
+  //////////////////////// End of Dummy Test Servo
   delay(1000);
-  Serial.println(".");
 }
-
+///////////////////// MPU Sensor data
 void readMPUData() {
   if (mpu.testConnection()) {
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
@@ -99,8 +94,8 @@ void readMPUData() {
   }
 }
 
+///////////////////// HMC Sensor data
 void readHMCData() {
-
   int x, y, z; //triple axis data
 
   //Tell the HMC what regist to begin writing data into
@@ -133,7 +128,7 @@ void readHMCData() {
   BTSerial.print(z);
   Serial.print("|");
 }
-
+///////////////////// Temp. Humidity and Pressure Sensor data
 void readHumidity() {
   float temp = bme.readTemperature();
   float hum = bme.readHumidity();
