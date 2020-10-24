@@ -1,75 +1,75 @@
-#include <SoftwareSerial.h>
+/// Start Add Libraries
 #include <Wire.h>
-#include <I2Cdev.h>
+//#include <I2Cdev.h>
 #include <MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Servo.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <avr/dtostrf.h>
+/// End Of Libraries
 
-#define PINServo 9
-#define PINVoltKnob A0
-#define ONE_WIRE_BUS 7
-
-#define addr 0x0D //I2C Address for The HMC5883
+/// Start of Definiations
 Servo ServoM;
-int ValueKnob;
-int ValueServ;
-int angle = 10;
-
 MPU6050 mpu;
-//SoftwareSerial BTSerial(BT_RX, BT_TX);
-#define BTSerial Serial2
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature dallasSensors(&oneWire);
+#define BTSerial Serial2 //(17(RX), 16(TX))
 Adafruit_BME280 bme = Adafruit_BME280();
+/// End of Definiations
 
+/// Start of parameter Declarations
+#define addr 0x0D /// I2C Address for The HMC5883L
+int     angle = 10;   /// Just dummy Motor Control position angle
 char    serial_buf[100];
-
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
-int error = 0;
+/// End of Parameter Declarations
 
+/// Start of Function Definiation
 void readMPUData();
 void readHMCData();
-//void readTemperature();
 void readHumidity();
+/// End of function Definiation
+
 /********************************************************************/
 void setup(void)
 {
-  // start serial port
+  // Initialize Software Serial port
   Serial.begin(9600);
+  delay(500);
+  // Initialize Bluetooth Serial port
   BTSerial.begin(9600);
-  ServoM.attach(PINServo);
-  ServoM.write(10);
-  Wire.begin();
-  //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
+  delay(500);
 
-  Wire.beginTransmission(addr); //start talking
-  Wire.write(0x0B); // Tell the HMC5883 to Continuously Measure
-  Wire.write(0x01); // Set the Register
+  // Initialize HMC5883L Communication
+  Wire.begin();  /// used for HMC5883L Sensor
+  //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
+  Wire.beginTransmission(addr); 
+  Wire.write(0x0B); 
+  Wire.write(0x01); 
   Wire.endTransmission();
   Wire.beginTransmission(addr); //start talking
   Wire.write(0x09); // Tell the HMC5883 to Continuously Measure
-  Wire.write(0x1D); // Set the Register
+  Wire.write(0x1D); 
   Wire.endTransmission();
+  delay(500);
+  /// End of HMC5883L Initialize
 
+  /// MPU Initialize
   mpu.initialize();
   delay(500);
-  dallasSensors.begin();
   Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-  Serial.println(dallasSensors.getDS18Count() > 0 ? "Temperature sensor found" : "Temperature sensor not found");
+  /// BME Initialize (0x76 is the I2C CHIP ID)
   Serial.println(bme.begin(0x76) > 0 ? "Humidity sensor found" : "Humidity sensor not found");
 }
 
 void loop(void)
 {
+  //// Contineously measure data
   readMPUData();
   readHMCData();
   readHumidity();
-  ValueKnob = analogRead(PINServo);
-  ValueServ = map(ValueKnob, 0, 1023, 5, 175); // will map knob value range to servo value range
-  ServoM.write(ValueServ); // shaft of servo will start to rotate.
+  ////
+  
+////////////////////////// Dummy Test Servo
 
   // scan from 0 to 180 degrees
   for (angle = 10; angle < 180; angle++)
@@ -83,6 +83,7 @@ void loop(void)
     ServoM.write(angle);
     delay(15);
   }
+//////////////////////// End of Dummy Test Servo
 
   delay(1000);
   Serial.println(".");
@@ -97,6 +98,7 @@ void readMPUData() {
     BTSerial.write(serial_buf);
   }
 }
+
 void readHMCData() {
 
   int x, y, z; //triple axis data
