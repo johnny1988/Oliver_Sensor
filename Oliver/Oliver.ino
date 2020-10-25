@@ -1,4 +1,6 @@
 /// Start Add Libraries
+// Uncomment next
+//#include <SoftwareSerial.h>
 #include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
@@ -6,10 +8,22 @@
 #include <Servo.h>
 /// End Of Libraries
 
+// Uncomment next
+// #define BT_RX          17
+// Uncomment next
+// #define BT_TX          16
+#define NO             0
+#define YES            1
+#define COMMAND_SERVO  'S'
+
 /// Start of Definiations
 Servo ServoM;
 MPU6050 mpu;
+// Comment next
 #define BTSerial Serial2 //(17(RX), 16(TX))
+#define PINServo 9
+// Uncomment next
+//SoftwareSerial BTSerial(BT_RX, BT_TX);
 Adafruit_BME280 bme = Adafruit_BME280();
 /// End of Definiations
 
@@ -19,12 +33,20 @@ int     angle = 10;   /// Just dummy Motor Control position angle
 char    serial_buf[100];
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
+int timer = 0;
+bool        packet_complete_;
+char        packet_[100],
+            *packet_ptr_;
+
 /// End of Parameter Declarations
 
 /// Start of Function Definiation
+void clear_packet();
+void read_packet();
 void readMPUData();
 void readHMCData();
 void readHumidity();
+void command_servo(char packet[]);
 /// End of function Definiation
 
 /********************************************************************/
@@ -36,6 +58,7 @@ void setup(void)
   // Initialize Bluetooth Serial port
   BTSerial.begin(9600);
   delay(500);
+  ServoM.attach(PINServo); /// attach the Servo Control on PIN 9
 
   // Initialize HMC5883L Communication
   Wire.begin();  /// used for HMC5883L Sensor
@@ -57,37 +80,37 @@ void setup(void)
   Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
   /// BME Initialize (0x76 is the I2C CHIP ID)
   Serial.println(bme.begin(0x76) > 0 ? "Humidity sensor found" : "Humidity sensor not found");
+  clear_packet();
 }
 
 void loop(void)
 {
+  read_packet();
+  if (packet_complete_) {
+    switch (packet_[0]) {
+      case  COMMAND_SERVO:
+        command_servo(packet_);
+        break;
+    }
+
+    packet_complete_ = NO;
+    packet_ptr_ = packet_;
+  }
   //// Contineously measure data
+  Serial.print("D");
+  BTSerial.print("D");
   readMPUData();
   readHMCData();
   readHumidity();
+  Serial.println();
+  BTSerial.println();
   ////
-
-  ////////////////////////// Dummy Test Servo
-  // scan from 0 to 180 degrees
-  for (angle = 10; angle < 180; angle++)
-  {
-    ServoM.write(angle);
-    delay(15);
-  }
-  // now scan back from 180 to 0 degrees
-  for (angle = 180; angle > 10; angle--)
-  {
-    ServoM.write(angle);
-    delay(15);
-  }
-  //////////////////////// End of Dummy Test Servo
-  delay(1000);
+  delay(100);
 }
 ///////////////////// MPU Sensor data
 void readMPUData() {
   if (mpu.testConnection()) {
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    delay(1500);
     sprintf(serial_buf, "X%d|Y%d|Z%d|GX%d|GY%d|GZ%d|", ax, ay, az, gx, gy, gz);
     Serial.println(serial_buf);
     BTSerial.write(serial_buf);
@@ -113,9 +136,8 @@ void readHMCData() {
     y = Wire.read(); //MSB y
     y |= Wire.read() << 8; //LSB y
   }
-  delay(500);
-  Serial.print("|MX");
-  BTSerial.print("|MX");
+  Serial.print("MX");
+  BTSerial.print("MX");
   Serial.print(x);
   BTSerial.print(x);
   Serial.print("|MY");
@@ -124,9 +146,10 @@ void readHMCData() {
   BTSerial.println(y);
   Serial.print("|MZ");
   BTSerial.print("|MZ");
-  Serial.println(z);
+  Serial.print(z);
   BTSerial.print(z);
   Serial.print("|");
+  BTSerial.print("|");
 }
 ///////////////////// Temp. Humidity and Pressure Sensor data
 void readHumidity() {
@@ -136,8 +159,8 @@ void readHumidity() {
 
   if (temp != 0 || hum != 0 || pres != 0)
   {
-    Serial.print("|BT");
-    BTSerial.print("|BT");
+    Serial.print("BT");
+    BTSerial.print("BT");
     Serial.print(temp);
     BTSerial.print(temp);
     Serial.print("|BH");
@@ -150,5 +173,55 @@ void readHumidity() {
     BTSerial.print(pres);
     Serial.print("|");
     BTSerial.print("|");
+  }
+}
+
+void read_packet()
+{
+  char  chr,
+        *ptr;
+
+  int   num_bytes;
+  if (BTSerial.available() && !packet_complete_) {
+    Serial.println("Available");
+    ////////////////////////////////////////////////////////////////////
+    // read characters into the array 'buf' until a newline character //
+    // is encountered. Replace the newline ('\n') with a null ('\0'). //
+    ////////////////////////////////////////////////////////////////////
+    while (!packet_complete_  &&  BTSerial.available()) {
+      chr = BTSerial.read();
+      if (chr != '\r') {
+        if (chr == '\n') {
+          chr = '\0';
+          packet_complete_ = YES;
+        }
+
+        *packet_ptr_++ = chr;
+        if (packet_complete_) {
+          Serial.print("Packet read:");
+          Serial.println(packet_);
+        }
+      }
+    }
+  }
+}
+
+void clear_packet()
+{
+  packet_ptr_ = packet_;
+  *packet_ptr_ = '\0';
+  packet_complete_ = NO;
+}
+
+void command_servo(char packet[]) {
+  int value = atoi(&packet[2]);
+  if (packet[1] == 'X') {
+    Serial.print("Servo:");
+    Serial.println(value);
+    ServoM.attach(PINServo); /// attach the Servo Control on PIN 9
+    ServoM.write(value);
+    delay(500);
+    ServoM.detach();
+
   }
 }
