@@ -1,8 +1,8 @@
 /*
    Project Flight Simulator
-   Developer: Janybasha Shaik
+   Developer: Johnny
    Board Arduino UNO
-   
+
  * */
 /// Start of Libraries
 #include <Wire.h>
@@ -15,16 +15,15 @@
 /// End Of Libraries
 
 /// Start of Definiations
-Servo ServoM;
-Servo servo1;
-Servo servo2;
-Servo servo3;
-Servo servoBluetooth;
+Servo ServoLidar;
+Servo ServoGyroX;
+Servo ServoGyroY;
+Servo ServoGyroZ;
+Servo ServoSlideBar;
 MPU6050 mpu;
 LIDARLite myLidarLite;
-SoftwareSerial BTSerial(0, 1);
-
-#define PINServo 9
+SoftwareSerial BTSerial(0, 1); ///Rx(0) Tx(1)
+#define PINServoL 9
 #define PINServoX 6
 #define PINServoY 7
 #define PINServoZ 8
@@ -76,8 +75,8 @@ void setup(void)
   // Initialize Bluetooth Serial port
   BTSerial.begin(9600);
   delay(500);
-  ServoM.attach(PINServo); /// attach the Servo Control on PIN 9
-  servoBluetooth.attach(PINServoB); /// attach the Servo Control on PIN 10
+  // ServoLidar.attach(PINServoL); /// attach the Servo Control on PIN 9
+  // ServoSlideBar.attach(PINServoB); /// attach the Servo Control on PIN 10
   myLidarLite.begin(0, true); // Set configuration to default and I2C to 400 kHz
   myLidarLite.configure(0); // Change this number to try out alternate configurations
 
@@ -141,39 +140,40 @@ void readMPUData() {
     Serial.println(serial_buf);
     BTSerial.write(serial_buf);
 
-    int val1 = map(ax, -17000, 17000, 0, 179);
-    if (abs(val1 - prevVal1) > 10)
-    {
-      servo1.attach(6);
-      servo1.write(val1);
-      Serial.println("ax: ");
-      Serial.println(val1);
-      prevVal1 = val1;
-    }
+    /*    int val1 = map(ax, -17000, 17000, 0, 179);
+        if (abs(val1 - prevVal1) > 10)
+        {
+          ServoGyroX.attach(6);
+          ServoGyroX.write(val1);
+          Serial.println("ax: ");
+          Serial.println(val1);
+          prevVal1 = val1;
+        }
 
-    int val2 = map(ay, -17000, 17000, 0, 179);
-    if (abs(val2 - prevVal2) > 10)
-    {
-      servo2.attach(7);
-      servo2.write(val2);
-      Serial.println("ay: ");
-      Serial.println(val2);
-      prevVal2 = val2;
-    }
+        int val2 = map(ay, -17000, 17000, 0, 179);
+        if (abs(val2 - prevVal2) > 10)
+        {
+          ServoGyroY.attach(7);
+          ServoGyroY.write(val2);
+          Serial.println("ay: ");
+          Serial.println(val2);
+          prevVal2 = val2;
+        }
 
-    int val3 = map(az, -17000, 17000, 0, 179);
-    if (abs(val3 - prevVal3) > 10)
-    {
-      servo3.attach(8);
-      servo3.write(val3);
-      Serial.println("az: ");
-      Serial.println(val3);
-      prevVal3 = val3;
-    }
-    delay(100);
-    servo1.detach();
-    servo2.detach();
-    servo3.detach();
+        int val3 = map(az, -17000, 17000, 0, 179);
+        if (abs(val3 - prevVal3) > 10)
+        {
+          ServoGyroZ.attach(8);
+          ServoGyroZ.write(val3);
+          Serial.println("az: ");
+          Serial.println(val3);
+          prevVal3 = val3;
+        }
+        delay(100);
+        ServoGyroX.detach();
+        ServoGyroY.detach();
+        ServoGyroZ.detach();
+      }*/
   }
 }
 
@@ -245,18 +245,28 @@ void LIDAR()
 {
   Serial.println(myLidarLite.distance());
   int Dist = myLidarLite.distance();
-  if (Dist > 180)
-  {
-    LidarVal = 180;
-  }
-  else
-  {
-    LidarVal = Dist;
-  }
-  ServoM.attach(PINServo); /// attach the Servo Control on PIN 9
-  ServoM.write(LidarVal);
-  delay(300);
-  ServoM.detach();
+  Serial.print("SL");
+  BTSerial.print("SL");
+  Serial.print(Dist);
+  BTSerial.print(Dist);
+  Serial.print("|");
+  BTSerial.print("|");
+
+  /* sprintf(serial_buf, "L%d|", Dist);
+    Serial.println(serial_buf);
+    BTSerial.write(serial_buf);
+    /*if (Dist > 180)
+     {
+     LidarVal = 180;
+     }
+     else
+     {
+     LidarVal = Dist;
+     }
+     ServoLidar.attach(PINServo); /// attach the Servo Control on PIN 9
+     ServoLidar.write(LidarVal);
+     delay(300);
+     ServoLidar.detach();*/
 }
 
 /********************************************************************/
@@ -279,7 +289,6 @@ void read_packet()
           chr = '\0';
           packet_complete_ = YES;
         }
-
         *packet_ptr_++ = chr;
         if (packet_complete_) {
           Serial.print("Packet read:");
@@ -299,13 +308,39 @@ void clear_packet()
 }
 
 /********************************************************************/
-void command_servo(char packet[]) {
+void command_servo(char packet[])
+{
   int value = atoi(&packet[2]);
   if (packet[1] == 'X') {
-    Serial.print("Servo:");
+    Serial.print("ServoGyroX:");
     Serial.println(value);
-    // ServoM.attach(PINServo); /// attach the Servo Control on PIN 10
-    servoBluetooth.write(value);
-    delay(500);
+     ServoGyroX.attach(PINServoX);
+     ServoGyroX.write(value);
+    delay(200);
   }
+  if (packet[1] == 'Y') {
+    Serial.print("ServoGyroY:");
+    Serial.println(value);
+    ServoGyroY.attach(PINServoY); /// attach the Servo Control on PIN 10
+    ServoGyroY.write(value);
+    delay(200);
+  }
+  if (packet[1] == 'Z') {
+    Serial.print("ServoGyroZ:");
+    Serial.println(value);
+    ServoGyroZ.attach(PINServoZ); /// attach the Servo Control on PIN 10
+    ServoGyroZ.write(value);
+    delay(200);
+  }
+  if (packet[1] == 'L') {
+    Serial.print("ServoGyroL:");
+    Serial.println(value);
+    ServoLidar.attach(PINServoL); /// attach the Servo Control on PIN 10
+    ServoLidar.write(value);
+    delay(200);
+  }
+  ServoGyroX.detach();
+  ServoGyroY.detach();
+  ServoGyroZ.detach();
+  ServoLidar.detach();
 }
