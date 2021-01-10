@@ -11,10 +11,11 @@
 #include <Adafruit_BME280.h>
 #include <Servo.h>
 #include <LIDARLite.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 /// End Of Libraries
 
 /// Start of Definiations
+
 Servo ServoLidar;
 Servo ServoGyroX;
 Servo ServoGyroY;
@@ -22,7 +23,8 @@ Servo ServoGyroZ;
 Servo ServoSlideBar;
 MPU6050 mpu;
 LIDARLite myLidarLite;
-SoftwareSerial BTSerial(0, 1); ///Rx(0) Tx(1)
+//SoftwareSerial BTSerial(0, 1); ///Rx(0) Tx(1)
+#define BTSerial Serial
 #define PINServoL 9
 #define PINServoX 6
 #define PINServoY 7
@@ -40,6 +42,9 @@ Adafruit_BME280 bme = Adafruit_BME280();
 #define addr 0x0D /// I2C Address for The HMC5883L
 int     angle = 10;   /// Just dummy Motor Control position angle
 char    serial_buf[100];
+char    DataRev[20];
+
+String value1;
 int ax1B = 0;
 int ay1B = 0;
 int az1B = 0;
@@ -47,7 +52,7 @@ int LidarVal = 0;
 int prevVal1 = 0;
 int prevVal2 = 0;
 int prevVal3 = 0;
-
+int Dist = 0;
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
 int timer = 0;
@@ -80,7 +85,6 @@ void setup(void)
   myLidarLite.begin(0, true); // Set configuration to default and I2C to 400 kHz
   myLidarLite.configure(0); // Change this number to try out alternate configurations
 
-
   // Initialize HMC5883L Communication
   Wire.begin();  /// used for HMC5883L Sensor
   //Serial.println(Wire.begin() > 0 ? "HMC5883L sensor found" : "HMC5883L sensor not found");
@@ -108,27 +112,31 @@ void setup(void)
 void loop(void)
 {
   read_packet();
-  if (packet_complete_) {
-    switch (packet_[0]) {
-      case  COMMAND_SERVO:
-        command_servo(packet_);
-        break;
-    }
+  packet_complete_ = NO;
 
-    packet_complete_ = NO;
-    packet_ptr_ = packet_;
-  }
+  //  if (packet_complete_)
+  //  {
+  //    switch (packet_[0])
+  //    {
+  //      case  COMMAND_SERVO:
+  //        command_servo(DataRev);
+  //        break;
+  //    }
+  //    packet_complete_ = NO;
+  //    packet_ptr_ = packet_;
+  //  }
 
   //// Contineously measure data
-  Serial.print("D");
+
+  // Serial.print("D");
   BTSerial.print("D");
   readMPUData();
   readHMCData();
   readHumidity();
-  Serial.println();
-  BTSerial.println();
+  // Serial.println();
+  // BTSerial.println();
   LIDAR();
-  delay(100);
+  //delay(100);
 }
 
 /********************************************************************/
@@ -136,9 +144,9 @@ void loop(void)
 void readMPUData() {
   if (mpu.testConnection()) {
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    sprintf(serial_buf, "X%d|Y%d|Z%d|GX%d|GY%d|GZ%d|", ax, ay, az, gx, gy, gz);
-    Serial.println(serial_buf);
-    BTSerial.write(serial_buf);
+    sprintf(serial_buf, "X%d|Y%d|Z%d|GX%d|GY%d|GZ%d|SL%d|", ax, ay, az, gx, gy, gz, Dist);
+    // Serial.println(serial_buf);
+    BTSerial.println(serial_buf);
 
     /*    int val1 = map(ax, -17000, 17000, 0, 179);
         if (abs(val1 - prevVal1) > 10)
@@ -197,19 +205,19 @@ void readHMCData() {
     y = Wire.read(); //MSB y
     y |= Wire.read() << 8; //LSB y
   }
-  Serial.print("|MX");
+  // Serial.print("|MX");
   BTSerial.print("|MX");
-  Serial.print(x);
+  // Serial.print(x);
   BTSerial.print(x);
-  Serial.print("|MY");
+  // Serial.print("|MY");
   BTSerial.print("|MY");
-  Serial.print(y);
-  BTSerial.println(y);
-  Serial.print("|MZ");
+  // Serial.print(y);
+  BTSerial.print(y);
+  // Serial.print("|MZ");
   BTSerial.print("|MZ");
-  Serial.print(z);
+  // Serial.print(z);
   BTSerial.print(z);
-  Serial.print("|");
+  // Serial.print("|");
   BTSerial.print("|");
 }
 
@@ -222,20 +230,20 @@ void readHumidity() {
 
   if (temp != 0 || hum != 0 || pres != 0)
   {
-    Serial.print("BT");
+    //Serial.print("BT");
     BTSerial.print("BT");
-    Serial.print(temp);
+    // Serial.print(temp);
     BTSerial.print(temp);
-    Serial.print("|BH");
+    // Serial.print("|BH");
     BTSerial.print("|BH");
-    Serial.print(hum);
+    // Serial.print(hum);
     BTSerial.print(hum);
-    Serial.print("|BP");
+    // Serial.print("|BP");
     BTSerial.print("|BP");
-    Serial.print(pres);
+    // Serial.print(pres);
     BTSerial.print(pres);
-    Serial.print("|");
-    BTSerial.print("|");
+    // Serial.print("|");
+    BTSerial.println("|");
   }
 }
 
@@ -243,60 +251,66 @@ void readHumidity() {
 /*LIDAR Distance measuring*/
 void LIDAR()
 {
-  Serial.println(myLidarLite.distance());
-  int Dist = myLidarLite.distance();
-  Serial.print("SL");
-  BTSerial.print("SL");
-  Serial.print(Dist);
-  BTSerial.print(Dist);
-  Serial.print("|");
-  BTSerial.print("|");
-
-  /* sprintf(serial_buf, "L%d|", Dist);
-    Serial.println(serial_buf);
-    BTSerial.write(serial_buf);
-    /*if (Dist > 180)
-     {
-     LidarVal = 180;
-     }
-     else
-     {
-     LidarVal = Dist;
-     }
-     ServoLidar.attach(PINServo); /// attach the Servo Control on PIN 9
-     ServoLidar.write(LidarVal);
-     delay(300);
-     ServoLidar.detach();*/
+  // Serial.println(myLidarLite.distance());
+  Dist = myLidarLite.distance();
+  //Serial.print("SL");
+  //BTSerial.print("SL");
+  // Serial.print(Dist);
+  // BTSerial.print(Dist);
+  // Serial.print("|");
+  //BTSerial.print("|");
 }
 
 /********************************************************************/
 void read_packet()
 {
-  char  chr,
-        *ptr;
-
+  char  chr, chr1, *ptr;
   int   num_bytes;
-  if (BTSerial.available() && !packet_complete_) {
-    Serial.println("Available");
-    ////////////////////////////////////////////////////////////////////
-    // read characters into the array 'buf' until a newline character //
-    // is encountered. Replace the newline ('\n') with a null ('\0'). //
-    ////////////////////////////////////////////////////////////////////
-    while (!packet_complete_  &&  BTSerial.available()) {
-      chr = BTSerial.read();
-      if (chr != '\r') {
-        if (chr == '\n') {
-          chr = '\0';
+  String chec;
+  int incr = 0;
+  String valuerChr;
+  int pos = 0;
+  if (BTSerial.available() && !packet_complete_)
+  {
+    while (!packet_complete_  &&  BTSerial.available())
+    {
+      chr1 = BTSerial.read();
+      //  String chrfull = BTSerial.readStringUntil('\r\n');
+
+      if (chr1 != '\r') {
+        if (chr1 == '\n') {
+          chr1 = '\0';
           packet_complete_ = YES;
         }
-        *packet_ptr_++ = chr;
-        if (packet_complete_) {
-          Serial.print("Packet read:");
-          Serial.println(packet_);
+        *packet_ptr_++ = chr1;
+        chec = chec + chr1;
+        DataRev[pos] = chr1;
+        pos++;
+        if (packet_complete_)
+        {
+          //BTSerial.println("Log:" + chec);
+          command_servo(chec);
         }
       }
     }
   }
+  //ServoLidar.detach();
+}
+
+String getValue(String data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = { 0, -1 };
+  int maxIndex = data.length() - 1;
+
+  for (int i = 0; i <= maxIndex && found <= index; i++) {
+    if (data.charAt(i) == separator || i == maxIndex) {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i + 1 : i;
+    }
+  }
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 /********************************************************************/
@@ -308,39 +322,113 @@ void clear_packet()
 }
 
 /********************************************************************/
-void command_servo(char packet[])
+void command_servo(String packet)
 {
-  int value = atoi(&packet[2]);
-  if (packet[1] == 'X') {
-    Serial.print("ServoGyroX:");
-    Serial.println(value);
-     ServoGyroX.attach(PINServoX);
-     ServoGyroX.write(value);
-    delay(200);
+  for (int i = 0; i < 4; i++)
+  {
+    String BluPack = getValue(packet, '|', i);
+    // BTSerial.println("Log:" + BluPack);
+    Set_Servo(BluPack);
+    //delay(200);
   }
-  if (packet[1] == 'Y') {
-    Serial.print("ServoGyroY:");
-    Serial.println(value);
-    ServoGyroY.attach(PINServoY); /// attach the Servo Control on PIN 10
-    ServoGyroY.write(value);
-    delay(200);
+
+  //  String Blu1 = getValue(packet, '|', 0);
+  //  // BTSerial.print(xva1);
+  //  // BTSerial.print("_");
+  //
+  //  String Blu2 = getValue(packet, '|', 1);
+  //  // BTSerial.print(xva2);
+  //  // BTSerial.print("_");
+  //
+  //  String Blu3 = getValue(packet, '|', 2);
+  //  // BTSerial.print(xva3);
+  //  // BTSerial.print("_");
+  //
+  //  String Blu4 = getValue(packet, '|', 3);
+  //  // BTSerial.print(xva4);
+  //  // BTSerial.print("_");
+}
+
+void Set_Servo(String BluPack)
+{
+  int leng = BluPack.length();
+  char buffer_Val[leng + 1];
+  BluPack.toCharArray(buffer_Val, leng + 1);
+  char Valuechar[3];
+
+  int value = 30;
+  String value1;
+
+  if (value > 20)
+  {
+    if (buffer_Val[1] == 'X')
+    {
+      Valuechar[0] = buffer_Val[2];
+      Valuechar[1] = buffer_Val[3];
+      Valuechar[2] = buffer_Val[4];
+      String Stringvale = Valuechar;
+      int MotorValu = (Stringvale).toInt();
+      if (MotorValu > 1)
+      {
+        ServoGyroX.attach(PINServoX);
+        ServoGyroX.write(MotorValu);
+      }
+      // BTSerial.print("Log:-------GyX");
+      // BTSerial.println(MotorValu);
+      //delay(300);
+    }
+    if (buffer_Val[1] == 'Y')
+    {
+      Valuechar[0] = buffer_Val[2];
+      Valuechar[1] = buffer_Val[3];
+      Valuechar[2] = buffer_Val[4];
+      String Stringvale = Valuechar;
+      int MotorValu = (Stringvale).toInt();
+      if (MotorValu > 1)
+      {
+        ServoGyroY.attach(PINServoY); /// attach the Servo Control on PIN 10
+        ServoGyroY.write(MotorValu);
+      }
+      // BTSerial.print("Log:-------GyY");
+      // BTSerial.println(MotorValu);
+      //delay(300);
+    }
+    if (buffer_Val[1] == 'Z')
+    {
+      Valuechar[0] = buffer_Val[2];
+      Valuechar[1] = buffer_Val[3];
+      Valuechar[2] = buffer_Val[4];
+      String Stringvale = Valuechar;
+      int MotorValu = (Stringvale).toInt();
+      if (MotorValu > 1)
+      {
+        ServoGyroZ.attach(PINServoZ); /// attach the Servo Control on PIN 10
+        ServoGyroZ.write(MotorValu);
+      }
+      // BTSerial.print("Log:-------GyZ");
+      // BTSerial.println(MotorValu);
+      // delay(300);
+    }
+    if (buffer_Val[1] == 'L')
+    {
+      Valuechar[0] = buffer_Val[2];
+      Valuechar[1] = buffer_Val[3];
+      Valuechar[2] = buffer_Val[4];
+      String Stringvale = Valuechar;
+      int MotorValu = (Stringvale).toInt();
+      if (MotorValu > 1)
+      {
+        ServoLidar.attach(PINServoL); /// attach the Servo Control on PIN 10
+        ServoLidar.write(MotorValu);
+      }
+      BTSerial.print("Log:-------Lid");
+      BTSerial.println(MotorValu);
+      //delay(200);
+    }
   }
-  if (packet[1] == 'Z') {
-    Serial.print("ServoGyroZ:");
-    Serial.println(value);
-    ServoGyroZ.attach(PINServoZ); /// attach the Servo Control on PIN 10
-    ServoGyroZ.write(value);
-    delay(200);
-  }
-  if (packet[1] == 'L') {
-    Serial.print("ServoGyroL:");
-    Serial.println(value);
-    ServoLidar.attach(PINServoL); /// attach the Servo Control on PIN 10
-    ServoLidar.write(value);
-    delay(200);
-  }
-  ServoGyroX.detach();
-  ServoGyroY.detach();
-  ServoGyroZ.detach();
-  ServoLidar.detach();
+
+  //  ServoGyroX.detach();
+  //  ServoGyroY.detach();
+  //  ServoGyroZ.detach();
+  //  ServoLidar.detach();
 }
